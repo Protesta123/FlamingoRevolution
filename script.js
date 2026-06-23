@@ -4,6 +4,26 @@ const scoreEl = document.getElementById("score");
 const livesEl = document.getElementById("lives");
 const msgEl = document.getElementById("message");
 const startScreen = document.getElementById("startScreen");
+const collectSound = new Audio("sounds/collect.mp3");
+const hitSound = new Audio("sounds/hit.mp3");
+const levelSound = new Audio("sounds/levelup.mp3");
+const victorySound = new Audio("sounds/victory.mp3");
+const wavesSound = new Audio("sounds/waves.mp3");
+
+collectSound.volume = 0.4;
+hitSound.volume = 0.5;
+levelSound.volume = 0.6;
+victorySound.volume = 0.7;
+wavesSound.volume = 0.35;
+wavesSound.loop = true;
+
+function playSound(sound){
+    sound.currentTime = 0;
+
+    sound.play().catch(function(err){
+        console.log("Audio error:", err);
+    });
+}
 
 let playerX = window.innerWidth / 2;
 let score = 0;
@@ -13,12 +33,35 @@ let level = 1;
 let gameRunning = false;
 let speed = 6;
 let panicMode = false;
+let isNight = false;
 let spawnTimer;
 
 const SW = () => window.innerWidth;
 const SH = () => window.innerHeight;
 
 function startGame() {
+    if (wavesSound.paused) {
+
+    wavesSound.currentTime = 0;
+
+    wavesSound.play().catch(err => {
+        console.log(err);
+    });
+}
+
+    collectSound.load();
+    hitSound.load();
+    levelSound.load();
+    victorySound.load();
+
+    collectSound.currentTime = 0;
+    collectSound.play()
+        .then(() => {
+            collectSound.pause();
+            collectSound.currentTime = 0;
+        })
+        .catch(err => console.log(err));
+
     startScreen.innerHTML = `
         <div style="display:flex; flex-direction:column; align-items:center; gap:20px; width:min(90vw, 400px);">
             <div id="loadTitle" style="font-size:clamp(1.4rem,5vw,2rem); font-weight:900; letter-spacing:-1px; text-shadow:0 3px 0 rgba(0,0,0,0.3);">
@@ -77,12 +120,24 @@ function startGame() {
     nextCheckpoint();
 
     function launch() {
-        score = 0;
+    score = 0;
         lives = 3;
         combo = 0;
         level = 1;
         speed = 6;
         gameRunning = true;
+        isNight = false;
+        document.querySelector(".mountains-bg").style.filter =
+"brightness(1)";
+
+document.querySelector(".grass").style.filter =
+"brightness(1)";
+        document
+    .getElementById("nightOverlay")
+    .classList.remove("active");
+
+game.style.background =
+"linear-gradient(to bottom,#4ec0ca,#70d0da,#c9eaf5,#dff5ff)";
 
         scoreEl.innerText = score;
         livesEl.innerText = "❤️❤️❤️";
@@ -192,6 +247,7 @@ function gameLoop() {
 function collectItem(item) {
     const isGolden = item.innerText.includes("✨");
     score += isGolden ? 50 : 10;
+    playSound(collectSound);
     combo++;
 
     if (combo === 5) {
@@ -205,17 +261,48 @@ function collectItem(item) {
     }
 
     scoreEl.innerText = score;
+    updateDayNight();
 
     // Level up every 120 points, speed jumps hard
     const newLevel = Math.floor(score / 120) + 1;
     if (newLevel > level) {
         level = newLevel;
         speed += 1.6;
+       playSound(levelSound);
         showMessage("🚨 PROTEST LEVEL " + level);
     }
 
     if (score > 0 && score % 250 === 0) moneyStorm();
     if (score >= 800) victory();
+}
+function updateDayNight(){
+
+    if(score >= 250 && !isNight){
+
+        isNight = true;
+
+        document
+            .getElementById("nightOverlay")
+            .classList.add("active");
+            document.querySelector(".mountains-bg").style.filter =
+"brightness(0.45)";
+
+document.querySelector(".grass").style.filter =
+"brightness(0.7)";
+
+        document.querySelectorAll(".cloud").forEach(cloud => {
+            cloud.style.opacity = "0.4";
+        });
+
+        const sun = document.querySelector(".sun");
+
+        if(sun){
+            sun.style.background =
+            "radial-gradient(circle,#f5f5f5 30%,#d6d6d6 70%,transparent 100%)";
+        }
+
+        showMessage("🌙 NIGHT HAS FALLEN!");
+    }
 }
 
 function startPanicMode() {
@@ -234,6 +321,7 @@ function startPanicMode() {
 }
 
 function loseLife() {
+    playSound(hitSound);
     lives--;
     startPanicMode();
     combo = 0;
@@ -243,6 +331,9 @@ function loseLife() {
 }
 
 function victory() {
+    wavesSound.pause();
+wavesSound.currentTime = 0;
+    playSound(victorySound);
     gameRunning = false;
     clearTimeout(spawnTimer);
     startScreen.style.display = "flex";
@@ -280,6 +371,8 @@ function moneyStorm() {
 }
 
 function gameOver() {
+    wavesSound.pause();
+wavesSound.currentTime = 0;
     gameRunning = false;
     clearTimeout(spawnTimer);
 
@@ -291,7 +384,7 @@ function gameOver() {
     startScreen.style.display = "flex";
     startScreen.innerHTML = `
         <div style="position:absolute; inset:0;
-            background-image:url('https://th.bing.com/th/id/OIP.f_XKn3W9np265oZ079SYKgHaFj?w=260&h=183&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3');
+            background-image:url('images/edi.png');
             background-size:cover; background-position:center top;
             filter:brightness(0.45) saturate(1.3);
             transform:scale(1.04); z-index:0;"></div>
@@ -299,7 +392,7 @@ function gameOver() {
         <div style="position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:100%; padding:0 20px;">
             <div style="font-size:clamp(1.8rem,7vw,4.5rem); font-weight:900; letter-spacing:-2px; margin-bottom:6px;
                 text-shadow:0 3px 0 rgba(0,0,0,0.5), 0 8px 30px rgba(0,0,0,0.5); line-height:1.1; text-align:center;">
-                💰 YOU GOT CAUGHT!
+                💰 Sazan was invaded!
             </div>
             <div style="font-size:clamp(11px,3vw,13px); color:rgba(255,255,255,0.55); margin-bottom:28px;
                 letter-spacing:3px; text-transform:uppercase; font-weight:700;">
