@@ -263,9 +263,10 @@ body { background: #4ec0ca; }
     z-index: 999;
 }
 
-/* ═══════════════════════════════════════
-   START SCREEN — DESKTOP (background image)
-   ═══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   START SCREEN — same on ALL screens
+   Full photo background, centered text
+   ══════════════════════════════════════ */
 #startScreen {
     position: absolute;
     inset: 0;
@@ -276,17 +277,17 @@ body { background: #4ec0ca; }
     color: white;
     z-index: 100;
     text-align: center;
-    padding: 40px 30px;
-    padding-bottom: env(safe-area-inset-bottom, 40px);
+    padding: 40px 24px;
+    padding-bottom: max(env(safe-area-inset-bottom, 40px), 40px);
     gap: 0;
     background:
         linear-gradient(to bottom,
-            rgba(4,12,24,0.50) 0%,
+            rgba(4,12,24,0.55) 0%,
             rgba(4,12,24,0.20) 30%,
             rgba(4,12,24,0.50) 65%,
-            rgba(4,12,24,0.88) 100%
+            rgba(4,12,24,0.90) 100%
         ),
-        url('images/ramahunting.png') center center / cover no-repeat;
+        url('images/ramahunting.png') 30% center / cover no-repeat;
 }
 
 #startScreen::before {
@@ -311,18 +312,14 @@ body { background: #4ec0ca; }
     pointer-events: none;
 }
 
-/* hero img — hidden on desktop, shown on mobile */
-#heroImg {
-    display: none;
-}
+/* heroImg always hidden — we use CSS background */
+#heroImg { display: none !important; }
 
-/* startContent — transparent wrapper on desktop */
-#startContent {
-    display: contents;
-}
+/* startContent transparent on all screens */
+#startContent { display: contents; }
 
 #startScreen h1 {
-    font-size: clamp(2.4rem, 7vw, 5.2rem);
+    font-size: clamp(2.2rem, 7vw, 5.2rem);
     margin-bottom: 8px;
     font-weight: 900;
     letter-spacing: -3px;
@@ -332,6 +329,7 @@ body { background: #4ec0ca; }
     -webkit-text-fill-color: transparent;
     background-clip: text;
     filter: drop-shadow(0 2px 20px rgba(255,64,129,0.4));
+    text-align: center;
 }
 
 #startScreen .tagline {
@@ -341,12 +339,13 @@ body { background: #4ec0ca; }
     color: rgba(255,120,170,0.75);
     font-weight: 600;
     margin-bottom: 24px;
+    text-align: center;
 }
 
 #startScreen p {
     margin-bottom: 32px;
     line-height: 2;
-    font-size: clamp(14px, 3.8vw, 17px);
+    font-size: clamp(14px, 3.5vw, 17px);
     color: rgba(255,255,255,0.92);
     background: rgba(0,0,0,0.42);
     backdrop-filter: blur(10px);
@@ -354,8 +353,8 @@ body { background: #4ec0ca; }
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 16px;
     padding: 14px 28px;
-    letter-spacing: 0.3px;
     max-width: 320px;
+    text-align: center;
 }
 
 /* ── BUTTON ── */
@@ -440,18 +439,15 @@ button:active {
 .day-sky  { background: linear-gradient(to bottom,#4ec0ca 0%,#70d0da 35%,#c9eaf5 65%,#dff5ff 100%) !important; }
 .night-sky{ background: linear-gradient(to bottom,#081c34 0%,#123456 40%,#1b4b72 70%,#294d6b 100%) !important; }
 
-/* ═══════════════════════════════════════
-   MOBILE — image as real <img> tag
-   ═══════════════════════════════════════ */
+/* ── MOBILE ── */
 @media (max-width: 768px) {
-
-    /* game elements */
     #player {
         font-size: 75px;
         bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
     }
     .item { font-size: 48px; }
     .rama-img { width: 62px; }
+
     #score {
         font-size: 22px;
         padding: 8px 14px 5px 14px;
@@ -485,67 +481,41 @@ button:active {
     #game .mountains-bg { height: 90px; }
     #game .grass { height: 22px; }
 
-    /* start screen — stacked layout */
+    button {
+        padding: 16px 36px;
+        min-width: min(85vw, 320px);
+        font-size: clamp(16px, 5vw, 20px);
+    }
+
     #startScreen {
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: center;
-        padding: 0;
-        background: #060e1a;
-        overflow: hidden;
-        height: 100vh;
-        height: 100dvh;
-    
-    }
-    #startScreen::before { display: none; }
-    #startScreen::after  { display: none; }
-
-    /* show the real img tag */
-    #heroImg {
-        display: block;
-        width: 100%;
-        height: 50dvh;
-        object-fit: cover;
-        object-position: center 30%;
-        flex-shrink: 0;
-    }
-
-    /* text+button panel */
-    #startContent {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        width: 100%;
-        height: 50dvh;
-        padding: 16px 20px max(env(safe-area-inset-bottom, 16px), 20px);
-        background: linear-gradient(to bottom, #07101f, #0d1a2e);
-        overflow: hidden;
+        padding: 24px 20px;
+        padding-bottom: max(env(safe-area-inset-bottom, 24px), 32px);
+        /* shift focal point so Rama's face shows on portrait */
+        background:
+            linear-gradient(to bottom,
+                rgba(4,12,24,0.55) 0%,
+                rgba(4,12,24,0.20) 30%,
+                rgba(4,12,24,0.50) 65%,
+                rgba(4,12,24,0.90) 100%
+            ),
+            url('images/ramahunting.png') 30% center / cover no-repeat;
     }
 
     #startScreen h1 {
         font-size: clamp(1.9rem, 8vw, 2.8rem);
         letter-spacing: -1px;
-        margin-bottom: 4px;
     }
     #startScreen .tagline {
         font-size: 10px;
         letter-spacing: 2px;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
     }
     #startScreen p {
-        margin-bottom: 18px;
+        margin-bottom: 20px;
         font-size: 14px;
         line-height: 1.9;
         padding: 10px 18px;
         max-width: 88vw;
-    }
-
-    button {
-        padding: 16px 36px;
-        min-width: min(85vw, 320px);
-        font-size: clamp(16px, 5vw, 20px);
     }
 }
 
@@ -554,7 +524,6 @@ button:active {
     #player { font-size: 62px; }
     .item { font-size: 40px; }
     .rama-img { width: 52px; }
-    #heroImg { height: 42vh; }
     #startScreen h1 { font-size: 1.7rem; }
     #startScreen p { font-size: 13px; padding: 8px 14px; }
     #startScreen .tagline { display: none; }
