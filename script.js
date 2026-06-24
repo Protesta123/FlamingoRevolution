@@ -55,6 +55,7 @@ let comboHideTimer = null;
 let frameId;
 let extraLifeAvailable = false; // tracks if extra-life heart is already on screen
 let lastExtraLifeScore = 0;     // to avoid spamming extra-life hearts
+let activeItems    = new Set(); // track items without DOM queries
 
 const SW = () => window.innerWidth;
 const SH = () => window.innerHeight;
@@ -87,7 +88,10 @@ function getSpawnWeights() {
 //  PARTICLES
 // ══════════════════════════════════
 function spawnParticles(x, y, color, count = 12, type = "burst") {
-    for (let i = 0; i < count; i++) {
+    // Cap particle count on mobile to reduce GPU overdraw
+    const isMobile = SW() < 500;
+    const cap = isMobile ? Math.ceil(count * 0.55) : count;
+    for (let i = 0; i < cap; i++) {
         const angle = (Math.PI * 2 / count) * i + Math.random() * 0.4;
         const spd   = type === "burst" ? 3 + Math.random() * 5 : 1 + Math.random() * 3;
         particles.push({
@@ -124,13 +128,19 @@ function updateParticles() {
     pCtx.globalAlpha = 1;
 }
 
-// ── SCREEN FLASH ──
+// ── SCREEN FLASH ── (reuse single element to avoid layout thrashing)
+let _flashEl = null;
+let _flashAnim = null;
 function screenFlash(color, opacity = 0.28) {
-    const fl = document.createElement("div");
-    fl.style.cssText = `position:absolute;inset:0;background:${color};opacity:${opacity};pointer-events:none;z-index:998;`;
-    game.appendChild(fl);
-    fl.animate([{ opacity }, { opacity: 0 }], { duration: 320, easing: "ease-out" })
-      .onfinish = () => fl.remove();
+    if (!_flashEl) {
+        _flashEl = document.createElement("div");
+        _flashEl.style.cssText = "position:absolute;inset:0;pointer-events:none;z-index:998;opacity:0;";
+        game.appendChild(_flashEl);
+    }
+    if (_flashAnim) { _flashAnim.cancel(); }
+    _flashEl.style.background = color;
+    _flashAnim = _flashEl.animate([{ opacity }, { opacity: 0 }], { duration: 320, easing: "ease-out" });
+    _flashAnim.onfinish = () => { _flashEl.style.opacity = "0"; _flashAnim = null; };
 }
 
 // ══════════════════════════════════
@@ -198,7 +208,7 @@ function startGame() {
         lives      = 3;
         combo      = 0;
         level      = 1;
-        speed      = 7;
+        speed      = 4;
         multiplier = 1;
         shielded   = false;
         invincible = false;
@@ -208,6 +218,7 @@ function startGame() {
         particles  = [];
         extraLifeAvailable = false;
         lastExtraLifeScore = 0;
+        activeItems.clear();
 
         document.querySelector(".mountains-bg").style.filter = "brightness(1)";
         document.querySelector(".grass").style.filter        = "brightness(1)";
@@ -310,6 +321,7 @@ function spawnObject() {
     }
 
     game.appendChild(div);
+    activeItems.add(div);
 }
 
 // ── GAME LOOP ──
@@ -319,9 +331,14 @@ function gameLoop() {
     frame++;
     updateParticles();
 
-    document.querySelectorAll(".item").forEach(item => {
-        let y = parseFloat(item.style.top);
+    // Cache player rect once per frame instead of per item
+    const pRect = player.getBoundingClientRect();
+    const slop  = SW() < 500 ? 12 : 8;
+
+    for (const item of activeItems) {
+        let y = parseFloat(item.dataset.y || item.style.top);
         y += speed;
+        item.dataset.y = y;
         item.style.top = y + "px";
 
         if (isNight && item.dataset.good === "false" && item.dataset.sineOffset !== undefined) {
@@ -331,8 +348,6 @@ function gameLoop() {
         }
 
         const iRect = item.getBoundingClientRect();
-        const pRect = player.getBoundingClientRect();
-        const slop  = SW() < 500 ? 12 : 8;
         const hit =
             iRect.left  + slop < pRect.right  - slop &&
             iRect.right - slop > pRect.left   + slop &&
@@ -346,15 +361,14 @@ function gameLoop() {
             else if (type === "multi")     collectMulti(item);
             else if (type === "extralife") collectExtraLife(item);
             else                           handleRamaHit(item);
+            activeItems.delete(item);
             item.remove();
-        }
-
-        if (y > SH() + 80) {
-            // If extra-life heart missed, mark it gone so another can spawn
+        } else if (y > SH() + 80) {
             if (item.dataset.good === "extralife") extraLifeAvailable = false;
+            activeItems.delete(item);
             item.remove();
         }
-    });
+    }
 
     frameId = requestAnimationFrame(gameLoop);
 }
@@ -524,7 +538,7 @@ function updateLevel() {
     const newLevel = Math.floor(score / 100) + 1;
     if (newLevel > level) {
         level = newLevel;
-        speed += Math.max(0.5, 1.4 - level * 0.04);
+        speed += Math.max(0.3, 0.7 - level * 0.02);
         playSound(levelSound);
         showMessage("🚨 Level " + level + (multiplier > 1 ? " ⚡" : ""));
     }
@@ -550,7 +564,7 @@ function startPanicMode() {
     panicMode = true;
     game.classList.add("shake");
     game.style.background = isNight ? "#1a0a0a" : "#ffb3b3";
-    speed += 2.5;
+    speed += 1.5;
     showMessage("💥 Panic mode!");
     screenFlash("rgba(255,0,0,0.35)", 0.35);
     const flash = document.createElement("div");
@@ -558,7 +572,7 @@ function startPanicMode() {
     game.appendChild(flash);
     setTimeout(() => flash.remove(), 350);
     setTimeout(() => {
-        speed -= 2.5;
+        speed -= 1.5;
         panicMode = false;
         game.style.background = "";
         game.classList.remove("shake");
@@ -638,6 +652,7 @@ function gameOver() {
     clearTimeout(spawnTimer);
     if (frameId) cancelAnimationFrame(frameId);
     particles = [];
+    activeItems.clear();
     pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
     startFlamingoMusic();
 
