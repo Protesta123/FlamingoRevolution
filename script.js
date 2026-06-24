@@ -57,6 +57,18 @@ let extraLifeAvailable = false; // tracks if extra-life heart is already on scre
 let lastExtraLifeScore = 0;     // to avoid spamming extra-life hearts
 let activeItems    = new Set(); // track items without DOM queries
 
+// ── BOSS STATE ──
+let bossActive       = false;
+let bossRound        = 0;
+let lastBossScore    = 0;  // trigger first boss at 750
+let bossHits         = 0;
+let bossTarget       = 0;
+let bossTimeLeft     = 0;
+let bossTimer        = null;
+let bossTickInterval = null;
+let bossHeads        = [];   // { el, x, y, vx, vy, size } objects
+let bossFrameId      = null;
+
 const SW = () => window.innerWidth;
 const SH = () => window.innerHeight;
 
@@ -219,6 +231,12 @@ function startGame() {
         extraLifeAvailable = false;
         lastExtraLifeScore = 0;
         activeItems.clear();
+        bossActive = false; bossRound = 0; lastBossScore = 0;
+        bossHeads  = [];
+        if (bossFrameId) cancelAnimationFrame(bossFrameId);
+        clearInterval(bossTickInterval);
+        const oldOverlay = document.getElementById("bossOverlay");
+        if (oldOverlay) oldOverlay.remove();
 
         document.querySelector(".mountains-bg").style.filter = "brightness(1)";
         document.querySelector(".grass").style.filter        = "brightness(1)";
@@ -419,6 +437,7 @@ function collectFlamingo(item) {
     updateDayNight();
     updateLevel();
     if (score > 0 && score % 300 === 0) moneyStorm();
+    checkBossTrigger();
 }
 
 function updateComboDisplay() {
@@ -651,6 +670,13 @@ function gameOver() {
     gameRunning = false;
     clearTimeout(spawnTimer);
     if (frameId) cancelAnimationFrame(frameId);
+    if (bossFrameId) cancelAnimationFrame(bossFrameId);
+    clearInterval(bossTickInterval);
+    bossActive = false;
+    for (const h of bossHeads) h.el.remove();
+    bossHeads = [];
+    const bossOvr = document.getElementById("bossOverlay");
+    if (bossOvr) bossOvr.remove();
     particles = [];
     activeItems.clear();
     pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
@@ -690,6 +716,322 @@ function gameOver() {
             ${isNewBest ? `<div style="margin-bottom:16px;background:linear-gradient(135deg,#ffd700,#ffaa00);color:#7a4a00;font-size:13px;font-weight:900;padding:9px 22px;border-radius:999px;box-shadow:0 4px 0 #b87a00;letter-spacing:1px;">🏆 New personal best!</div>` : ""}
             <button onclick="location.reload()">🦩 Start New Revolution</button>
         </div>`;
+}
+
+// ══════════════════════════════════
+//  BOSS FIGHT SYSTEM
+// ══════════════════════════════════
+
+function checkBossTrigger() {
+    if (bossActive) return;
+    const nextBoss = lastBossScore + 750;
+    if (score >= nextBoss) {
+        lastBossScore = nextBoss;
+        setTimeout(startBossFight, 400);
+    }
+}
+
+function getBossConfig(round) {
+    // Gets harder each round
+    return {
+        heads:  Math.min(3 + round, 7),
+        target: 5 + (round - 1) * 3,
+        time:   Math.max(8, 15 - (round - 1) * 2),
+        speed:  1.8 + round * 0.7,
+        size:   Math.max(55, 90 - round * 5)
+    };
+}
+
+function startBossFight() {
+    if (!gameRunning || bossActive) return;
+    bossActive = true;
+    bossRound++;
+    bossHits = 0;
+
+    const cfg = getBossConfig(bossRound);
+    bossTarget   = cfg.target;
+    bossTimeLeft = cfg.time;
+
+    // Pause normal game
+    clearTimeout(spawnTimer);
+    if (frameId) cancelAnimationFrame(frameId);
+    // Clear all falling items
+    for (const item of activeItems) item.remove();
+    activeItems.clear();
+
+    // Build overlay
+    const overlay = document.createElement("div");
+    overlay.id = "bossOverlay";
+    overlay.innerHTML = `
+        <div id="bossWarning">
+            <div id="bossWarningIcon">⚠️</div>
+            <div id="bossWarningText">BOSS INCOMING!</div>
+            <div id="bossRoundText">Round ${bossRound}</div>
+        </div>`;
+    game.appendChild(overlay);
+
+    // Show warning for 1.8s then launch arena
+    setTimeout(() => {
+        const warning = document.getElementById("bossWarning");
+        if (warning) warning.style.opacity = "0";
+        setTimeout(() => launchBossArena(cfg), 400);
+    }, 1800);
+}
+
+function launchBossArena(cfg) {
+    if (!gameRunning) return;
+
+    // Replace warning content with HUD
+    const overlay = document.getElementById("bossOverlay");
+    if (!overlay) return;
+    overlay.innerHTML = `
+        <div id="bossHud">
+            <div id="bossHudLeft">
+                <div id="bossHudLabel">HIT RAMA</div>
+                <div id="bossHitCount"><span id="bossHitsEl">0</span> / ${cfg.target}</div>
+            </div>
+            <div id="bossHudRight">
+                <div id="bossHudLabel">TIME</div>
+                <div id="bossTimerEl">${cfg.time}s</div>
+            </div>
+        </div>
+        <div id="bossCrosshair">＋</div>
+        <div id="bossGun">🔫</div>
+        <canvas id="bossShootLine"></canvas>`;
+
+    // Spawn bouncing heads
+    bossHeads = [];
+    for (let i = 0; i < cfg.heads; i++) {
+        spawnBossHead(cfg);
+    }
+
+    // Crosshair + gun follow touch/mouse
+    const crosshair = document.getElementById("bossCrosshair");
+    const gun       = document.getElementById("bossGun");
+    const shootCanvas = document.getElementById("bossShootLine");
+    const sCtx     = shootCanvas ? shootCanvas.getContext("2d") : null;
+    if (shootCanvas) { shootCanvas.width = SW(); shootCanvas.height = window.innerHeight; }
+
+    let aimX = SW() / 2, aimY = window.innerHeight / 2;
+
+    function updateAim(x, y) {
+        aimX = x; aimY = y;
+        if (crosshair) { crosshair.style.left = x + "px"; crosshair.style.top = y + "px"; }
+        if (gun) {
+            // Gun sits bottom-centre, barrel points toward aim point
+            const gunX = SW() / 2;
+            const gunY = window.innerHeight - 60;
+            const angle = Math.atan2(y - gunY, x - gunX) * 180 / Math.PI;
+            gun.style.left = gunX + "px";
+            gun.style.top  = gunY + "px";
+            // flip gun emoji when pointing left so it doesn't shoot backwards
+            const scaleX = x < gunX ? -1 : 1;
+            gun.style.transform = `translate(-50%, -50%) rotate(${angle}deg) scaleY(${scaleX})`;
+        }
+    }
+
+    function shootEffect() {
+        if (!sCtx || !shootCanvas) return;
+        const gunX = SW() / 2, gunY = window.innerHeight - 60;
+        sCtx.clearRect(0, 0, shootCanvas.width, shootCanvas.height);
+        // Muzzle flash
+        sCtx.beginPath();
+        sCtx.arc(gunX, gunY, 18, 0, Math.PI * 2);
+        sCtx.fillStyle = "rgba(255,220,60,0.85)";
+        sCtx.fill();
+        // Laser line
+        sCtx.beginPath();
+        sCtx.moveTo(gunX, gunY);
+        sCtx.lineTo(aimX, aimY);
+        sCtx.strokeStyle = "rgba(255,80,0,0.7)";
+        sCtx.lineWidth = 3;
+        sCtx.stroke();
+        setTimeout(() => sCtx.clearRect(0, 0, shootCanvas.width, shootCanvas.height), 80);
+    }
+
+    overlay.addEventListener("touchmove", e => {
+        e.preventDefault();
+        updateAim(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+    overlay.addEventListener("touchstart", e => {
+        updateAim(e.touches[0].clientX, e.touches[0].clientY);
+        shootEffect();
+    }, { passive: true });
+    overlay.addEventListener("mousemove", e => updateAim(e.clientX, e.clientY));
+    overlay.addEventListener("mousedown", () => shootEffect());
+
+    updateAim(SW() / 2, window.innerHeight / 2);
+
+    // Start countdown tick
+    bossTickInterval = setInterval(() => {
+        bossTimeLeft--;
+        const timerEl = document.getElementById("bossTimerEl");
+        if (timerEl) {
+            timerEl.textContent = bossTimeLeft + "s";
+            if (bossTimeLeft <= 5) timerEl.style.color = "#ff4444";
+        }
+        if (bossTimeLeft <= 0) bossFail();
+    }, 1000);
+
+    // Boss animation loop
+    bossFrameId = requestAnimationFrame(bossLoop);
+}
+
+function spawnBossHead(cfg) {
+    const el = document.createElement("div");
+    el.className = "boss-head";
+    const size = cfg.size;
+    el.style.cssText = `
+        position:absolute;
+        width:${size}px; height:${size}px;
+        cursor:crosshair;
+        z-index:210;
+        border-radius:50%;
+        overflow:hidden;
+        box-shadow: 0 0 0 3px rgba(255,60,60,0.7), 0 4px 18px rgba(0,0,0,0.5);
+        transition: transform 0.07s;
+        will-change: transform;
+    `;
+    el.innerHTML = `<img src="images/EdiRama.png" style="width:100%;height:100%;object-fit:cover;object-position:top;pointer-events:none;">`;
+
+    const angle = Math.random() * Math.PI * 2;
+    const spd   = cfg.speed;
+    const head  = {
+        el,
+        x: 60 + Math.random() * (SW() - 120),
+        y: 80 + Math.random() * (window.innerHeight * 0.5),
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        size,
+        hit: false
+    };
+
+    el.addEventListener("touchstart", e => { e.preventDefault(); hitBossHead(head, cfg); }, { passive: false });
+    el.addEventListener("mousedown",  ()  => hitBossHead(head, cfg));
+
+    const overlay = document.getElementById("bossOverlay");
+    if (overlay) overlay.appendChild(el);
+    bossHeads.push(head);
+    el.style.left = head.x + "px";
+    el.style.top  = head.y + "px";
+}
+
+function hitBossHead(head, cfg) {
+    if (head.hit || !bossActive) return;
+    head.hit = true;
+    bossHits++;
+
+    // Flash red & scale down
+    head.el.style.transform = "scale(0.7)";
+    head.el.style.boxShadow = "0 0 0 4px #ff2222, 0 0 24px rgba(255,0,0,0.8)";
+
+    // Particle burst at head center
+    const rect = head.el.getBoundingClientRect();
+    spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, "#ff4444", SW() < 500 ? 8 : 14, "burst");
+    spawnParticles(rect.left + rect.width/2, rect.top + rect.height/2, "#ff9900", SW() < 500 ? 4 : 7);
+    playSound(hitSound);
+
+    if (navigator.vibrate) navigator.vibrate(40);
+
+    // Update hit counter
+    const hitsEl = document.getElementById("bossHitsEl");
+    if (hitsEl) hitsEl.textContent = bossHits;
+
+    // Remove head after flash, respawn a new one to keep count
+    setTimeout(() => {
+        head.el.remove();
+        bossHeads = bossHeads.filter(h => h !== head);
+        if (bossActive && bossHits < bossTarget) {
+            spawnBossHead(cfg); // keep arena full
+        }
+    }, 220);
+
+    if (bossHits >= bossTarget) {
+        setTimeout(() => bossVictory(), 300);
+    }
+}
+
+function bossLoop() {
+    if (!bossActive) return;
+    const W = SW(), H = window.innerHeight;
+
+    for (const head of bossHeads) {
+        if (head.hit) continue;
+        head.x += head.vx;
+        head.y += head.vy;
+
+        // Bounce off walls
+        if (head.x < 0)              { head.x = 0;           head.vx = Math.abs(head.vx); }
+        if (head.x > W - head.size)  { head.x = W-head.size; head.vx = -Math.abs(head.vx); }
+        if (head.y < 0)              { head.y = 0;           head.vy = Math.abs(head.vy); }
+        if (head.y > H - head.size)  { head.y = H-head.size; head.vy = -Math.abs(head.vy); }
+
+        head.el.style.left = head.x + "px";
+        head.el.style.top  = head.y + "px";
+    }
+
+    // Also keep drawing particles during boss
+    updateParticles();
+
+    bossFrameId = requestAnimationFrame(bossLoop);
+}
+
+function bossVictory() {
+    if (!bossActive) return;
+    endBossMode();
+
+    const bonus = 200 + bossRound * 50;
+    score += bonus;
+    scoreEl.innerText = score;
+
+    // Extra life every other round
+    if (bossRound % 2 === 0 && lives < 3) {
+        lives = Math.min(lives + 1, 3);
+        livesEl.innerText = "❤️".repeat(lives);
+        showMessage(`🏆 Boss defeated! +${bonus}pts + 💗`);
+    } else {
+        showMessage(`🏆 Boss defeated! +${bonus}pts!`);
+    }
+
+    screenFlash("rgba(255,215,0,0.4)", 0.4);
+    playSound(victorySound);
+
+    // Resume normal game
+    setTimeout(() => {
+        spawnLoop();
+        gameLoop();
+    }, 600);
+}
+
+function bossFail() {
+    if (!bossActive) return;
+    endBossMode();
+
+    showMessage("💀 Boss escaped! -1 life");
+    playSound(hitSound);
+    screenFlash("rgba(255,0,0,0.4)", 0.4);
+    loseLife();
+
+    if (gameRunning) {
+        setTimeout(() => {
+            spawnLoop();
+            gameLoop();
+        }, 600);
+    }
+}
+
+function endBossMode() {
+    bossActive = false;
+    clearInterval(bossTickInterval);
+    if (bossFrameId) cancelAnimationFrame(bossFrameId);
+
+    // Remove all heads
+    for (const head of bossHeads) head.el.remove();
+    bossHeads = [];
+
+    // Remove overlay
+    const overlay = document.getElementById("bossOverlay");
+    if (overlay) overlay.remove();
 }
 
 // ── PLAYER MOVEMENT ──
