@@ -38,8 +38,6 @@ function stopFlamingoMusic() {
     flamingoSound.currentTime = 0;
 }
 
-// Play flamingo music on page load (start screen)
-// Browsers block autoplay until user interaction — so we try on first touch/click
 let flamingoStarted = false;
 function tryStartFlamingo() {
     if (flamingoStarted) return;
@@ -63,12 +61,21 @@ let spawnTimer;
 const SW = () => window.innerWidth;
 const SH = () => window.innerHeight;
 
+// ── SHARED SCREEN BUILDER ──
+// Restores the start screen to photo + content layout (used by gameOver + reload)
+function showStartScreen(extraContent) {
+    startScreen.style.display = "flex";
+    startScreen.innerHTML = `
+        <img src="images/ramahunting.png" id="heroImg" alt="">
+        <div id="startContent">
+            ${extraContent}
+        </div>`;
+}
+
 // ── START GAME ──
 function startGame() {
-    // Stop start screen music
     stopFlamingoMusic();
 
-    // Unlock game audio
     if (wavesSound.paused) {
         wavesSound.currentTime = 0;
         wavesSound.play().catch(() => {});
@@ -78,15 +85,17 @@ function startGame() {
         s.play().then(() => { s.pause(); s.currentTime = 0; }).catch(() => {});
     });
 
+    // Loading screen — uses same photo layout
     startScreen.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:20px;width:min(90vw,400px);">
-            <div id="loadTitle" style="font-size:clamp(1.4rem,5vw,2rem);font-weight:900;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,0.3);">
+        <img src="images/ramahunting.png" id="heroImg" alt="">
+        <div id="startContent" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:100%;padding:24px 20px;">
+            <div id="loadTitle" style="font-size:clamp(1.2rem,5vw,1.8rem);font-weight:900;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,0.3);text-align:center;">
                 🦩 Mobilizing flamingos...
             </div>
-            <div style="width:100%;height:22px;background:rgba(0,0,0,0.35);border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,0.15);">
+            <div style="width:min(90%,360px);height:22px;background:rgba(0,0,0,0.35);border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,0.15);">
                 <div id="loadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff4081,#ff7ab3);border-radius:999px;transition:width 0.3s ease;box-shadow:0 0 12px rgba(255,64,129,0.6);"></div>
             </div>
-            <div id="loadLabel" style="font-size:14px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.6);text-transform:uppercase;">0%</div>
+            <div id="loadLabel" style="font-size:14px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.6);text-transform:uppercase;text-align:center;">0%</div>
         </div>`;
 
     const messages = [
@@ -346,17 +355,10 @@ function spawnFloatingText(text, x, y, color) {
     const el = document.createElement("div");
     el.innerText = text;
     el.style.cssText = `
-        position:absolute;
-        left:${x};
-        top:${y};
-        color:${color};
-        font-size:22px;
-        font-weight:900;
-        pointer-events:none;
-        z-index:999;
+        position:absolute;left:${x};top:${y};color:${color};
+        font-size:22px;font-weight:900;pointer-events:none;z-index:999;
         text-shadow:0 2px 8px rgba(0,0,0,0.5);
-        transition:top 0.8s ease, opacity 0.8s ease;
-        opacity:1;
+        transition:top 0.8s ease,opacity 0.8s ease;opacity:1;
     `;
     game.appendChild(el);
     requestAnimationFrame(() => {
@@ -452,8 +454,6 @@ function gameOver() {
     wavesSound.pause(); wavesSound.currentTime = 0;
     gameRunning = false;
     clearTimeout(spawnTimer);
-
-    // Restart start screen music
     startFlamingoMusic();
 
     const best = Number(localStorage.getItem("bestScore")) || 0;
@@ -463,33 +463,31 @@ function gameOver() {
 
     startScreen.style.display = "flex";
     startScreen.innerHTML = `
-        <div class="gameover-bg"></div>
-        <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;width:100%;padding:0 20px;">
-            <div style="font-size:clamp(1.8rem,7vw,4.5rem);font-weight:900;letter-spacing:-2px;margin-bottom:6px;
-                text-shadow:0 3px 0 rgba(0,0,0,0.5),0 8px 30px rgba(0,0,0,0.5);line-height:1.1;text-align:center;">
+        <img src="images/ramahunting.png" id="heroImg" alt="">
+        <div id="startContent">
+            <div style="font-size:clamp(1.6rem,6vw,3.5rem);font-weight:900;letter-spacing:-2px;margin-bottom:6px;
+                text-shadow:0 3px 0 rgba(0,0,0,0.5);line-height:1.1;text-align:center;">
                 💰 Sazan was invaded!
             </div>
-            <div style="font-size:clamp(11px,3vw,13px);color:rgba(255,255,255,0.55);margin-bottom:24px;
-                letter-spacing:3px;text-transform:uppercase;font-weight:700;">
+            <div style="font-size:clamp(10px,2.5vw,13px);color:rgba(255,255,255,0.55);margin-bottom:16px;
+                letter-spacing:3px;text-transform:uppercase;font-weight:700;text-align:center;">
                 by Edi Rama himself
             </div>
-            <div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap;justify-content:center;">
+            <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;justify-content:center;">
                 <div style="text-align:center;background:rgba(0,0,0,0.5);
                     border:1.5px solid rgba(255,255,255,0.15);border-radius:20px;
-                    padding:clamp(12px,4vw,18px) clamp(20px,6vw,36px);
-                    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-width:120px;">
-                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:8px;">Your Score</div>
-                    <div style="font-size:clamp(36px,10vw,52px);font-weight:900;color:white;line-height:1;letter-spacing:-2px;">${score}</div>
+                    padding:12px 28px;backdrop-filter:blur(12px);min-width:110px;">
+                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:6px;">Your Score</div>
+                    <div style="font-size:clamp(32px,8vw,48px);font-weight:900;color:white;line-height:1;letter-spacing:-2px;">${score}</div>
                 </div>
                 <div style="text-align:center;background:rgba(0,0,0,0.5);
                     border:1.5px solid rgba(255,215,0,0.3);border-radius:20px;
-                    padding:clamp(12px,4vw,18px) clamp(20px,6vw,36px);
-                    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-width:120px;">
-                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,215,0,0.6);text-transform:uppercase;margin-bottom:8px;">🏆 Best</div>
-                    <div style="font-size:clamp(36px,10vw,52px);font-weight:900;color:#ffd700;line-height:1;letter-spacing:-2px;">${bestFinal}</div>
+                    padding:12px 28px;backdrop-filter:blur(12px);min-width:110px;">
+                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,215,0,0.6);text-transform:uppercase;margin-bottom:6px;">🏆 Best</div>
+                    <div style="font-size:clamp(32px,8vw,48px);font-weight:900;color:#ffd700;line-height:1;letter-spacing:-2px;">${bestFinal}</div>
                 </div>
             </div>
-            ${isNewBest ? `<div style="margin-bottom:18px;background:linear-gradient(135deg,#ffd700,#ffaa00);color:#7a4a00;font-size:13px;font-weight:900;padding:8px 20px;border-radius:999px;box-shadow:0 4px 0 #b87a00;letter-spacing:1px;">🏆 NEW PERSONAL BEST!</div>` : ""}
+            ${isNewBest ? `<div style="margin-bottom:14px;background:linear-gradient(135deg,#ffd700,#ffaa00);color:#7a4a00;font-size:13px;font-weight:900;padding:8px 20px;border-radius:999px;box-shadow:0 4px 0 #b87a00;letter-spacing:1px;text-align:center;">🏆 NEW PERSONAL BEST!</div>` : ""}
             <button onclick="location.reload()">🦩 Start New Revolution</button>
         </div>`;
 }
