@@ -277,14 +277,15 @@ body { background: #4ec0ca; }
     padding: 40px 30px;
     padding-bottom: env(safe-area-inset-bottom, 40px);
     gap: 0;
+    /* cover works universally — position tweaked per breakpoint */
     background:
         linear-gradient(to bottom,
-            rgba(4,12,24,0.50) 0%,
-            rgba(4,12,24,0.25) 35%,
-            rgba(4,12,24,0.55) 70%,
-            rgba(4,12,24,0.88) 100%
+            rgba(4,12,24,0.55) 0%,
+            rgba(4,12,24,0.20) 30%,
+            rgba(4,12,24,0.50) 65%,
+            rgba(4,12,24,0.90) 100%
         ),
-        url('images/ramahunting.png') center 40% / 110% auto no-repeat;
+        url('images/ramahunting.png') 65% center / cover no-repeat;
 }
 
 /* thin glowing line above title */
@@ -294,7 +295,7 @@ body { background: #4ec0ca; }
     width: min(280px, 70vw);
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255,64,129,0.7), rgba(255,255,255,0.5), rgba(78,192,202,0.7), transparent);
-    top: calc(50% - 100px);
+    top: calc(50% - 110px);
     left: 50%;
     transform: translateX(-50%);
     pointer-events: none;
@@ -306,8 +307,8 @@ body { background: #4ec0ca; }
     position: absolute;
     bottom: 0;
     left: 0; right: 0;
-    height: 200px;
-    background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(255,64,129,0.10), transparent 80%);
+    height: 220px;
+    background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255,64,129,0.12), transparent 80%);
     pointer-events: none;
 }
 
@@ -321,7 +322,7 @@ body { background: #4ec0ca; }
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    filter: drop-shadow(0 2px 20px rgba(255,64,129,0.35));
+    filter: drop-shadow(0 2px 20px rgba(255,64,129,0.4));
 }
 
 #startScreen .tagline {
@@ -330,21 +331,22 @@ body { background: #4ec0ca; }
     text-transform: uppercase;
     color: rgba(255,120,170,0.75);
     font-weight: 600;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
 #startScreen p {
-    margin-bottom: 36px;
-    line-height: 2.2;
-    font-size: clamp(14px, 3.5vw, 17px);
-    color: rgba(255,255,255,0.90);
-    background: rgba(0,0,0,0.38);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    margin-bottom: 32px;
+    line-height: 2;
+    font-size: clamp(14px, 3.8vw, 17px);
+    color: rgba(255,255,255,0.92);
+    background: rgba(0,0,0,0.42);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.10);
-    border-radius: 14px;
+    border-radius: 16px;
     padding: 14px 28px;
     letter-spacing: 0.3px;
+    max-width: 320px;
 }
 
 /* ── BUTTON ── */
@@ -429,64 +431,105 @@ button:active {
 .day-sky  { background: linear-gradient(to bottom,#4ec0ca 0%,#70d0da 35%,#c9eaf5 65%,#dff5ff 100%) !important; }
 .night-sky{ background: linear-gradient(to bottom,#081c34 0%,#123456 40%,#1b4b72 70%,#294d6b 100%) !important; }
 
-/* ── MOBILE ── */
-@media (max-width: 768px) {
-    #player {
-        font-size: 80px;
-        bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
-    }
-    .item { font-size: 50px; }
-    .rama-img { width: 65px; }
-
-    #score {
-        font-size: 24px;
-        padding: 8px 14px 5px 14px;
-        min-width: 65px;
-        top: env(safe-area-inset-top, 12px);
-        left: 12px;
-    }
-    #lives {
-        top: calc(env(safe-area-inset-top, 12px) + 52px);
-        font-size: 16px;
-        padding: 4px 14px 7px 14px;
-        min-width: 65px;
-        left: 12px;
-    }
-    #message {
-        font-size: 15px;
-        padding: 7px 14px;
-        max-width: 80vw;
-        white-space: normal;
-        text-align: center;
-        top: calc(env(safe-area-inset-top, 0px) + 16px);
-    }
-    #startScreen h1 { font-size: clamp(2rem, 9vw, 3rem); letter-spacing: -1px; }
-    #startScreen .tagline { letter-spacing: 2.5px; margin-bottom: 22px; }
-    #startScreen p { margin-bottom: 28px; line-height: 2; padding: 12px 18px; }
-    .cloud { font-size: 55px; }
-    #game .sun {
-        width: 46px; height: 46px;
-        right: 16px;
-        top: calc(env(safe-area-inset-top, 0px) + 16px);
-    }
-    #game .mountains-bg { height: 100px; }
-    #game .grass { height: 24px; }
-    button { padding: 16px 40px; min-width: 200px; }
+/* ── TABLET (landscape phones, small tablets) ── */
+@media (max-width: 900px) {
     #startScreen {
-        background-size: 160% auto;
-        background-position: 55% 40%;
+        background-position: 60% center;
     }
 }
 
-/* ── VERY SMALL PHONES ── */
-@media (max-width: 390px) {
-    #player { font-size: 65px; }
-    .item { font-size: 42px; }
-    .rama-img { width: 55px; }
-    #startScreen h1 { font-size: 1.8rem; }
-    #startScreen p { font-size: 13px; }
-    #startScreen {
-        background-size: 190% auto;
-        background-position: 55% 40%;
+/* ── MOBILE ── */
+@media (max-width: 768px) {
+    #player {
+        font-size: 75px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
     }
+    .item { font-size: 48px; }
+    .rama-img { width: 62px; }
+
+    #score {
+        font-size: 22px;
+        padding: 8px 14px 5px 14px;
+        min-width: 60px;
+        top: env(safe-area-inset-top, 12px);
+        left: 12px;
+        border-radius: 16px 16px 0 0;
+    }
+    #lives {
+        top: calc(env(safe-area-inset-top, 12px) + 48px);
+        font-size: 15px;
+        padding: 4px 14px 7px 14px;
+        min-width: 60px;
+        left: 12px;
+        border-radius: 0 0 16px 16px;
+    }
+    #message {
+        font-size: 14px;
+        padding: 6px 14px;
+        max-width: 78vw;
+        white-space: normal;
+        text-align: center;
+        top: calc(env(safe-area-inset-top, 0px) + 14px);
+    }
+    .cloud { font-size: 50px; }
+    #game .sun {
+        width: 42px; height: 42px;
+        right: 14px;
+        top: calc(env(safe-area-inset-top, 0px) + 14px);
+    }
+    #game .mountains-bg { height: 90px; }
+    #game .grass { height: 22px; }
+
+    button {
+        padding: 16px 36px;
+        min-width: 85vw;
+        font-size: clamp(16px, 5vw, 20px);
+    }
+
+    /* Start screen — portrait phone optimized */
+    #startScreen {
+        padding: 24px 20px;
+        padding-top: env(safe-area-inset-top, 24px);
+        padding-bottom: max(env(safe-area-inset-bottom, 24px), 40px);
+        justify-content: flex-end;
+        background-position: 65% 20%;
+    }
+
+    #startScreen h1 {
+        font-size: clamp(2.2rem, 10vw, 3.2rem);
+        letter-spacing: -2px;
+        margin-bottom: 6px;
+    }
+
+    #startScreen .tagline {
+        font-size: 10px;
+        letter-spacing: 2px;
+        margin-bottom: 16px;
+    }
+
+    #startScreen p {
+        margin-bottom: 20px;
+        line-height: 1.9;
+        font-size: 15px;
+        padding: 12px 20px;
+        max-width: 90vw;
+    }
+
+    #startScreen::before {
+        top: auto;
+        bottom: calc(50% + 20px);
+    }
+}
+
+/* ── VERY SMALL PHONES (SE, older Android) ── */
+@media (max-width: 390px) {
+    #player { font-size: 62px; }
+    .item { font-size: 40px; }
+    .rama-img { width: 52px; }
+
+    #startScreen h1 { font-size: 1.9rem; }
+    #startScreen p { font-size: 13px; padding: 10px 16px; }
+    #startScreen .tagline { display: none; }
+
+    button { min-width: 90vw; padding: 15px 28px; }
 }
