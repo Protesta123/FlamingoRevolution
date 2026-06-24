@@ -285,7 +285,7 @@ body { background: #4ec0ca; }
             rgba(4,12,24,0.50) 65%,
             rgba(4,12,24,0.90) 100%
         ),
-        url('images/ramahunting.png') 65% center / cover no-repeat;
+        url('images/ramahunting.png') 30% center / cover no-repeat;
 }
 
 /* thin glowing line above title */
@@ -487,12 +487,12 @@ button:active {
     }
 
     /* Start screen — portrait phone optimized */
-    #startScreen {
+  #startScreen {
         padding: 24px 20px;
         padding-top: env(safe-area-inset-top, 24px);
         padding-bottom: max(env(safe-area-inset-bottom, 24px), 40px);
         justify-content: flex-end;
-        background-position: 65% 20%;
+        background-position: 30% 50%;
     }
 
     #startScreen h1 {
