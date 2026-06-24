@@ -1,91 +1,105 @@
-const game = document.getElementById("game");
-const player = document.getElementById("player");
-const scoreEl = document.getElementById("score");
-const livesEl = document.getElementById("lives");
-const msgEl = document.getElementById("message");
-const startScreen = document.getElementById("startScreen");
-const collectSound = new Audio("sounds/collect.mp3");
-const hitSound = new Audio("sounds/hit.mp3");
-const levelSound = new Audio("sounds/levelup.mp3");
-const victorySound = new Audio("sounds/victory.mp3");
-const wavesSound = new Audio("sounds/waves.mp3");
+// ── ELEMENTS ──
+const game       = document.getElementById("game");
+const player     = document.getElementById("player");
+const scoreEl    = document.getElementById("score");
+const livesEl    = document.getElementById("lives");
+const msgEl      = document.getElementById("message");
+const startScreen= document.getElementById("startScreen");
 
-collectSound.volume = 0.4;
-hitSound.volume = 0.5;
-levelSound.volume = 0.6;
-victorySound.volume = 0.7;
-wavesSound.volume = 0.35;
-wavesSound.loop = true;
+// ── SOUNDS ──
+const collectSound  = new Audio("sounds/collect.mp3");
+const hitSound      = new Audio("sounds/hit.mp3");
+const levelSound    = new Audio("sounds/levelup.mp3");
+const victorySound  = new Audio("sounds/victory.mp3");
+const wavesSound    = new Audio("sounds/waves.mp3");
+const flamingoSound = new Audio("sounds/flamingo.mp3");
 
-function playSound(sound){
+collectSound.volume  = 0.4;
+hitSound.volume      = 0.5;
+levelSound.volume    = 0.6;
+victorySound.volume  = 0.7;
+wavesSound.volume    = 0.35;
+wavesSound.loop      = true;
+flamingoSound.volume = 0.6;
+flamingoSound.loop   = true;
+
+function playSound(sound) {
     sound.currentTime = 0;
-
-    sound.play().catch(function(err){
-        console.log("Audio error:", err);
-    });
+    sound.play().catch(() => {});
 }
 
-let playerX = window.innerWidth / 2;
-let score = 0;
-let lives = 3;
-let combo = 0;
-let level = 1;
-let gameRunning = false;
-let speed = 6;
-let panicMode = false;
-let isNight = false;
+function startFlamingoMusic() {
+    flamingoSound.currentTime = 0;
+    flamingoSound.play().catch(() => {});
+}
+
+function stopFlamingoMusic() {
+    flamingoSound.pause();
+    flamingoSound.currentTime = 0;
+}
+
+// Play flamingo music on page load (start screen)
+// Browsers block autoplay until user interaction — so we try on first touch/click
+let flamingoStarted = false;
+function tryStartFlamingo() {
+    if (flamingoStarted) return;
+    flamingoStarted = true;
+    startFlamingoMusic();
+}
+document.addEventListener("touchstart", tryStartFlamingo, { once: true });
+document.addEventListener("mousedown",  tryStartFlamingo, { once: true });
+
+// ── STATE ──
+let playerX, score, lives, combo, level, speed;
+let gameRunning     = false;
+let panicMode       = false;
+let isNight         = false;
+let invincible      = false;
+let shielded        = false;
+let multiplier      = 1;
+let multiplierTimer = null;
 let spawnTimer;
 
 const SW = () => window.innerWidth;
 const SH = () => window.innerHeight;
 
+// ── START GAME ──
 function startGame() {
+    // Stop start screen music
+    stopFlamingoMusic();
+
+    // Unlock game audio
     if (wavesSound.paused) {
-
-    wavesSound.currentTime = 0;
-
-    wavesSound.play().catch(err => {
-        console.log(err);
+        wavesSound.currentTime = 0;
+        wavesSound.play().catch(() => {});
+    }
+    [collectSound, hitSound, levelSound, victorySound].forEach(s => {
+        s.load();
+        s.play().then(() => { s.pause(); s.currentTime = 0; }).catch(() => {});
     });
-}
-
-    collectSound.load();
-    hitSound.load();
-    levelSound.load();
-    victorySound.load();
-
-    collectSound.currentTime = 0;
-    collectSound.play()
-        .then(() => {
-            collectSound.pause();
-            collectSound.currentTime = 0;
-        })
-        .catch(err => console.log(err));
 
     startScreen.innerHTML = `
-        <div style="display:flex; flex-direction:column; align-items:center; gap:20px; width:min(90vw, 400px);">
-            <div id="loadTitle" style="font-size:clamp(1.4rem,5vw,2rem); font-weight:900; letter-spacing:-1px; text-shadow:0 3px 0 rgba(0,0,0,0.3);">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:20px;width:min(90vw,400px);">
+            <div id="loadTitle" style="font-size:clamp(1.4rem,5vw,2rem);font-weight:900;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,0.3);">
                 🦩 Mobilizing flamingos...
             </div>
-            <div style="width:100%; height:22px; background:rgba(0,0,0,0.35); border-radius:999px; overflow:hidden; border:2px solid rgba(255,255,255,0.15);">
-                <div id="loadBar" style="height:100%; width:0%; background:linear-gradient(90deg,#ff4081,#ff7ab3); border-radius:999px; transition:width 0.3s ease; box-shadow:0 0 12px rgba(255,64,129,0.6);"></div>
+            <div style="width:100%;height:22px;background:rgba(0,0,0,0.35);border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,0.15);">
+                <div id="loadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ff4081,#ff7ab3);border-radius:999px;transition:width 0.3s ease;box-shadow:0 0 12px rgba(255,64,129,0.6);"></div>
             </div>
-            <div id="loadLabel" style="font-size:14px; font-weight:700; letter-spacing:2px; color:rgba(255,255,255,0.6); text-transform:uppercase;">0%</div>
-        </div>
-    `;
+            <div id="loadLabel" style="font-size:14px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.6);text-transform:uppercase;">0%</div>
+        </div>`;
 
     const messages = [
         "🦩 Mobilizing flamingos...",
         "🌊 Checking the lagoon...",
         "🚨 Edi Rama spotted nearby...",
-        "💪 Revolution loading...",
+        "🛡️ Arming the revolution...",
         "🦩 Almost ready..."
     ];
 
-    const loadBar = document.getElementById("loadBar");
+    const loadBar   = document.getElementById("loadBar");
     const loadLabel = document.getElementById("loadLabel");
-    const titleEl = document.getElementById("loadTitle");
-
+    const titleEl   = document.getElementById("loadTitle");
     let progress = 0;
     const checkpoints = [18, 35, 52, 68, 80, 91, 100];
     let cpIndex = 0;
@@ -97,8 +111,7 @@ function startGame() {
             if (progress > target) progress = target;
             loadBar.style.width = progress + "%";
             loadLabel.innerText = Math.floor(progress) + "%";
-            const msgIndex = Math.min(Math.floor((progress / 100) * messages.length), messages.length - 1);
-            titleEl.innerText = messages[msgIndex];
+            titleEl.innerText = messages[Math.min(Math.floor((progress / 100) * messages.length), messages.length - 1)];
             setTimeout(step, 40);
         };
         step();
@@ -116,32 +129,34 @@ function startGame() {
             }
         });
     }
-
     nextCheckpoint();
 
     function launch() {
-    score = 0;
-        lives = 3;
-        combo = 0;
-        level = 1;
-        speed = 6;
-        gameRunning = true;
-        isNight = false;
-        document.querySelector(".mountains-bg").style.filter =
-"brightness(1)";
+        score      = 0;
+        lives      = 3;
+        combo      = 0;
+        level      = 1;
+        speed      = 6;
+        multiplier = 1;
+        shielded   = false;
+        invincible = false;
+        isNight    = false;
+        gameRunning= true;
 
-document.querySelector(".grass").style.filter =
-"brightness(1)";
-        document
-    .getElementById("nightOverlay")
-    .classList.remove("active");
+        document.querySelector(".mountains-bg").style.filter = "brightness(1)";
+        document.querySelector(".grass").style.filter        = "brightness(1)";
+        document.getElementById("nightOverlay").classList.remove("active");
+        document.querySelectorAll(".cloud").forEach(c => c.style.opacity = "0.88");
+        const sun = document.querySelector(".sun");
+        if (sun) sun.style.background = "radial-gradient(circle,#fff7a0 30%,#ffd84d 65%,transparent 100%)";
 
-game.style.background =
-"linear-gradient(to bottom,#4ec0ca,#70d0da,#c9eaf5,#dff5ff)";
+        game.style.background = "linear-gradient(to bottom,#4ec0ca,#70d0da,#c9eaf5,#dff5ff)";
 
         scoreEl.innerText = score;
         livesEl.innerText = "❤️❤️❤️";
-        msgEl.innerText = "";
+        msgEl.innerText   = "";
+
+        player.style.filter = "drop-shadow(0 0 8px #ff7ac8) drop-shadow(0 0 18px #ff7ac8) drop-shadow(0 0 30px #ff7ac8)";
 
         playerX = SW() / 2;
         updatePlayer();
@@ -156,85 +171,105 @@ game.style.background =
     }
 }
 
+// ── MESSAGES ──
+let msgTimeout;
 function showMessage(text) {
+    clearTimeout(msgTimeout);
     msgEl.innerText = text;
-    setTimeout(() => { msgEl.innerText = ""; }, 1500);
+    msgEl.style.transform = "translateX(-50%) scale(1.15)";
+    setTimeout(() => msgEl.style.transform = "translateX(-50%) scale(1)", 150);
+    msgTimeout = setTimeout(() => { msgEl.innerText = ""; }, 1800);
 }
 
+// ── SPAWN ──
 function spawnLoop() {
     if (!gameRunning) return;
     spawnObject();
-    // starts at 600ms, bottoms out at 120ms — spawns get relentless fast
     const spawnRate = Math.max(120, 600 - Math.floor(score / 1.8));
     spawnTimer = setTimeout(spawnLoop, spawnRate);
 }
 
 function getRamaSize() {
-    const base = Math.round(SW() * 0.13);
-    return Math.min(130, Math.max(60, base));
+    return Math.min(130, Math.max(60, Math.round(SW() * 0.13)));
 }
-
 function getFlamSize() {
-    const base = Math.round(SW() * 0.11);
-    return Math.min(70, Math.max(40, base));
+    return Math.min(70, Math.max(40, Math.round(SW() * 0.11)));
 }
 
 function spawnObject() {
     const div = document.createElement("div");
     div.className = "item";
 
-    // Starts at 55% Rama, maxes at 88% — immediately threatening
-    const obstacleChance = Math.min(0.88, 0.55 + score / 700);
-    const isGood = Math.random() > obstacleChance;
+    const obstacleChance = Math.min(0.85, 0.55 + score / 700);
+    const roll = Math.random();
+    const canPowerUp = score > 50;
 
-    div.dataset.good = isGood ? "true" : "false";
-
-    const flamSize = getFlamSize();
-    const ramaSize = getRamaSize();
-
-    if (isGood) {
-        if (Math.random() < 0.07) {
-            div.innerText = "✨🦩";
-        } else {
-            div.innerText = "🦩";
-        }
-        div.style.fontSize = flamSize + "px";
-    } else {
-        // Rama grows after score 300
-        const size = score >= 300
-            ? Math.min(ramaSize * 1.35, 170)
-            : ramaSize;
+    if (canPowerUp && roll < 0.04) {
+        div.dataset.good = "shield";
+        div.innerText = "🛡️";
+        div.style.fontSize = getFlamSize() + "px";
+    } else if (canPowerUp && roll < 0.07) {
+        div.dataset.good = "multi";
+        div.innerText = "⚡";
+        div.style.fontSize = getFlamSize() + "px";
+    } else if (roll < obstacleChance) {
+        div.dataset.good = "false";
+        const ramaSize = getRamaSize();
+        const size = score >= 300 ? Math.min(ramaSize * 1.35, 170) : ramaSize;
         div.innerHTML = `<img src="images/EdiRama.png" class="rama-img" style="width:${Math.round(size)}px;">`;
+    } else {
+        div.dataset.good = "true";
+        const flamSize = getFlamSize();
+        div.innerText = (Math.random() < 0.07) ? "✨🦩" : "🦩";
+        div.style.fontSize = flamSize + "px";
     }
 
-    const itemW = isGood ? flamSize : getRamaSize();
-    const maxX = SW() - itemW - 10;
+    const itemW = getFlamSize();
+    const maxX  = SW() - itemW - 10;
     div.style.left = (10 + Math.random() * maxX) + "px";
-    div.style.top = "-80px";
+    div.style.top  = "-80px";
+
+    if (isNight && div.dataset.good === "false") {
+        div.dataset.sineOffset  = Math.random() * Math.PI * 2;
+        div.dataset.sineOriginX = parseFloat(div.style.left);
+    }
 
     game.appendChild(div);
 }
 
+// ── GAME LOOP ──
+let frame = 0;
 function gameLoop() {
     if (!gameRunning) return;
+    frame++;
 
     document.querySelectorAll(".item").forEach(function(item) {
         let y = parseFloat(item.style.top);
         y += speed;
         item.style.top = y + "px";
 
-        const itemRect = item.getBoundingClientRect();
-        const playerRect = player.getBoundingClientRect();
+        if (isNight && item.dataset.good === "false" && item.dataset.sineOffset !== undefined) {
+            const originX = parseFloat(item.dataset.sineOriginX);
+            const drift   = Math.sin(frame * 0.06 + parseFloat(item.dataset.sineOffset)) * 28;
+            const newX    = Math.max(0, Math.min(SW() - getRamaSize(), originX + drift));
+            item.style.left = newX + "px";
+        }
+
+        const iRect = item.getBoundingClientRect();
+        const pRect = player.getBoundingClientRect();
 
         const hit =
-            itemRect.left + 8 < playerRect.right - 8 &&
-            itemRect.right - 8 > playerRect.left + 8 &&
-            itemRect.top + 8 < playerRect.bottom - 8 &&
-            itemRect.bottom - 8 > playerRect.top + 8;
+            iRect.left + 8 < pRect.right  - 8 &&
+            iRect.right- 8 > pRect.left   + 8 &&
+            iRect.top  + 8 < pRect.bottom - 8 &&
+            iRect.bottom-8 > pRect.top    + 8;
 
         if (hit) {
-            if (item.dataset.good === "true") collectItem(item);
-            else loseLife();
+            const type = item.dataset.good;
+            if      (type === "true")   collectItem(item);
+            else if (type === "shield") collectShield(item);
+            else if (type === "multi")  collectMulti(item);
+            else                        loseLife();
             item.remove();
         }
 
@@ -244,116 +279,158 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// ── COLLECT FLAMINGO ──
 function collectItem(item) {
     const isGolden = item.innerText.includes("✨");
-    score += isGolden ? 50 : 10;
+    const pts = (isGolden ? 50 : 10) * multiplier;
+    score += pts;
     playSound(collectSound);
-    combo++;
+    spawnFloatingText("+" + pts, item.style.left, item.style.top, isGolden ? "#ffd700" : "#fff");
 
+    combo++;
     if (combo === 5) {
-        score += 30;
+        score += 30 * multiplier;
+        showMessage("🔥 COMBO x5! +" + (30 * multiplier));
         combo = 0;
-        showMessage("🔥 COMBO x5! +30");
     } else if (combo === 10) {
-        score += 80;
+        score += 100 * multiplier;
+        showMessage("💥 MEGA COMBO x10! +" + (100 * multiplier));
         combo = 0;
-        showMessage("💥 MEGA COMBO! +80");
     }
 
     scoreEl.innerText = score;
     updateDayNight();
 
-    // Level up every 120 points, speed jumps hard
     const newLevel = Math.floor(score / 120) + 1;
     if (newLevel > level) {
         level = newLevel;
-        speed += 1.6;
-       playSound(levelSound);
-        showMessage("🚨 PROTEST LEVEL " + level);
+        speed += 1.4;
+        playSound(levelSound);
+        showMessage("🚨 PROTEST LEVEL " + level + (multiplier > 1 ? " ⚡2x" : ""));
     }
 
     if (score > 0 && score % 250 === 0) moneyStorm();
-    if (score >= 800) victory();
+    // endless mode — no victory
 }
-function updateDayNight(){
 
-    if(score >= 250 && !isNight){
+// ── POWER-UPS ──
+function collectShield(item) {
+    shielded = true;
+    playSound(collectSound);
+    showMessage("🛡️ SHIELD ACTIVE!");
+    player.style.filter = "drop-shadow(0 0 10px #00cfff) drop-shadow(0 0 24px #00cfff) drop-shadow(0 0 40px #00cfff)";
+    spawnFloatingText("🛡️ SHIELD", item.style.left, item.style.top, "#00cfff");
+    setTimeout(() => {
+        shielded = false;
+        player.style.filter = "drop-shadow(0 0 8px #ff7ac8) drop-shadow(0 0 18px #ff7ac8) drop-shadow(0 0 30px #ff7ac8)";
+        showMessage("🛡️ Shield gone!");
+    }, 6000);
+}
 
+function collectMulti(item) {
+    multiplier = 2;
+    playSound(collectSound);
+    showMessage("⚡ 2x SCORE ACTIVE!");
+    player.style.filter = "drop-shadow(0 0 10px #ffd700) drop-shadow(0 0 24px #ffd700) drop-shadow(0 0 40px #ffd700)";
+    spawnFloatingText("⚡ 2x!", item.style.left, item.style.top, "#ffd700");
+    clearTimeout(multiplierTimer);
+    multiplierTimer = setTimeout(() => {
+        multiplier = 1;
+        player.style.filter = "drop-shadow(0 0 8px #ff7ac8) drop-shadow(0 0 18px #ff7ac8) drop-shadow(0 0 30px #ff7ac8)";
+        showMessage("⚡ 2x expired");
+    }, 8000);
+}
+
+// ── FLOATING TEXT ──
+function spawnFloatingText(text, x, y, color) {
+    const el = document.createElement("div");
+    el.innerText = text;
+    el.style.cssText = `
+        position:absolute;
+        left:${x};
+        top:${y};
+        color:${color};
+        font-size:22px;
+        font-weight:900;
+        pointer-events:none;
+        z-index:999;
+        text-shadow:0 2px 8px rgba(0,0,0,0.5);
+        transition:top 0.8s ease, opacity 0.8s ease;
+        opacity:1;
+    `;
+    game.appendChild(el);
+    requestAnimationFrame(() => {
+        el.style.top = (parseFloat(y) - 60) + "px";
+        el.style.opacity = "0";
+    });
+    setTimeout(() => el.remove(), 900);
+}
+
+// ── DAY / NIGHT ──
+function updateDayNight() {
+    if (score >= 300 && !isNight) {
         isNight = true;
-
-        document
-            .getElementById("nightOverlay")
-            .classList.add("active");
-            document.querySelector(".mountains-bg").style.filter =
-"brightness(0.45)";
-
-document.querySelector(".grass").style.filter =
-"brightness(0.7)";
-
-        document.querySelectorAll(".cloud").forEach(cloud => {
-            cloud.style.opacity = "0.4";
-        });
-
+        document.getElementById("nightOverlay").classList.add("active");
+        document.querySelector(".mountains-bg").style.filter = "brightness(0.4)";
+        document.querySelector(".grass").style.filter        = "brightness(0.6)";
+        document.querySelectorAll(".cloud").forEach(c => c.style.opacity = "0.3");
         const sun = document.querySelector(".sun");
-
-        if(sun){
-            sun.style.background =
-            "radial-gradient(circle,#f5f5f5 30%,#d6d6d6 70%,transparent 100%)";
-        }
-
+        if (sun) sun.style.background = "radial-gradient(circle,#c8d8e8 30%,#8090a0 70%,transparent 100%)";
         showMessage("🌙 NIGHT HAS FALLEN!");
     }
 }
 
+// ── PANIC MODE ──
 function startPanicMode() {
     if (panicMode) return;
     panicMode = true;
     game.classList.add("shake");
-    game.style.background = "#ffb3b3";
+    game.style.background = isNight ? "#1a0a0a" : "#ffb3b3";
     speed += 2;
     showMessage("💥 PANIC MODE!");
+    const flash = document.createElement("div");
+    flash.className = "hit-flash";
+    game.appendChild(flash);
+    setTimeout(() => flash.remove(), 400);
     setTimeout(() => {
-        speed -= 2;
+        speed    -= 2;
         panicMode = false;
         game.style.background = "";
         game.classList.remove("shake");
     }, 3000);
 }
 
+// ── LOSE LIFE ──
 function loseLife() {
-    playSound(hitSound);
+    if (invincible) return;
+    if (shielded) {
+        shielded = false;
+        player.style.filter = "drop-shadow(0 0 8px #ff7ac8) drop-shadow(0 0 18px #ff7ac8) drop-shadow(0 0 30px #ff7ac8)";
+        showMessage("🛡️ Shield absorbed the hit!");
+        playSound(hitSound);
+        return;
+    }
     lives--;
-    startPanicMode();
     combo = 0;
-    livesEl.innerText = "❤️".repeat(lives);
+    playSound(hitSound);
+    startPanicMode();
+    invincible = true;
+    player.style.opacity = "0.4";
+    let blinks = 0;
+    const blinkInterval = setInterval(() => {
+        player.style.opacity = player.style.opacity === "0.4" ? "1" : "0.4";
+        if (++blinks >= 8) {
+            clearInterval(blinkInterval);
+            player.style.opacity = "1";
+            invincible = false;
+        }
+    }, 250);
+    livesEl.innerText = "❤️".repeat(Math.max(0, lives));
     if (lives <= 0) gameOver();
-    else showMessage("💥 Ouch!");
+    else showMessage("💥 Ouch! " + lives + " left");
 }
 
-function victory() {
-    wavesSound.pause();
-wavesSound.currentTime = 0;
-    playSound(victorySound);
-    gameRunning = false;
-    clearTimeout(spawnTimer);
-    startScreen.style.display = "flex";
-    startScreen.innerHTML = `
-        <div style="font-size:clamp(2rem,7vw,4rem); font-weight:900; letter-spacing:-2px; margin-bottom:12px; text-shadow:0 3px 0 rgba(0,0,0,0.4); text-align:center;">
-            🦩 REVOLUTION WON!
-        </div>
-        <div style="font-size:clamp(1rem,4vw,1.3rem); color:rgba(255,255,255,0.75); margin-bottom:32px; letter-spacing:1px; text-align:center;">
-            You saved the flamingos of Sazan Island!
-        </div>
-        <div style="display:flex; gap:16px; margin-bottom:32px; justify-content:center;">
-            <div style="text-align:center; background:rgba(0,0,0,0.4); border:1.5px solid rgba(255,255,255,0.15); border-radius:20px; padding:16px 30px; backdrop-filter:blur(12px);">
-                <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,0.5); text-transform:uppercase; margin-bottom:6px;">Final Score</div>
-                <div style="font-size:48px; font-weight:900; color:white; line-height:1; letter-spacing:-2px;">${score}</div>
-            </div>
-        </div>
-        <button onclick="location.reload()">🦩 Play Again</button>
-    `;
-}
-
+// ── MONEY STORM ──
 function moneyStorm() {
     showMessage("💰 MONEY STORM!");
     const ramaSize = getRamaSize();
@@ -364,17 +441,20 @@ function moneyStorm() {
             div.dataset.good = "false";
             div.innerHTML = `<img src="images/EdiRama.png" class="rama-img" style="width:${ramaSize}px;">`;
             div.style.left = Math.random() * (SW() - ramaSize - 10) + "px";
-            div.style.top = "-80px";
+            div.style.top  = "-80px";
             game.appendChild(div);
         }, i * 100);
     }
 }
 
+// ── GAME OVER ──
 function gameOver() {
-    wavesSound.pause();
-wavesSound.currentTime = 0;
+    wavesSound.pause(); wavesSound.currentTime = 0;
     gameRunning = false;
     clearTimeout(spawnTimer);
+
+    // Restart start screen music
+    startFlamingoMusic();
 
     const best = Number(localStorage.getItem("bestScore")) || 0;
     if (score > best) localStorage.setItem("bestScore", score);
@@ -383,43 +463,38 @@ wavesSound.currentTime = 0;
 
     startScreen.style.display = "flex";
     startScreen.innerHTML = `
-        <div style="position:absolute; inset:0;
-            background-image:url('images/edi.png');
-            background-size:cover; background-position:center top;
-            filter:brightness(0.45) saturate(1.3);
-            transform:scale(1.04); z-index:0;"></div>
-
-        <div style="position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:100%; padding:0 20px;">
-            <div style="font-size:clamp(1.8rem,7vw,4.5rem); font-weight:900; letter-spacing:-2px; margin-bottom:6px;
-                text-shadow:0 3px 0 rgba(0,0,0,0.5), 0 8px 30px rgba(0,0,0,0.5); line-height:1.1; text-align:center;">
+        <div class="gameover-bg"></div>
+        <div style="position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;width:100%;padding:0 20px;">
+            <div style="font-size:clamp(1.8rem,7vw,4.5rem);font-weight:900;letter-spacing:-2px;margin-bottom:6px;
+                text-shadow:0 3px 0 rgba(0,0,0,0.5),0 8px 30px rgba(0,0,0,0.5);line-height:1.1;text-align:center;">
                 💰 Sazan was invaded!
             </div>
-            <div style="font-size:clamp(11px,3vw,13px); color:rgba(255,255,255,0.55); margin-bottom:28px;
-                letter-spacing:3px; text-transform:uppercase; font-weight:700;">
+            <div style="font-size:clamp(11px,3vw,13px);color:rgba(255,255,255,0.55);margin-bottom:24px;
+                letter-spacing:3px;text-transform:uppercase;font-weight:700;">
                 by Edi Rama himself
             </div>
-            <div style="display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap; justify-content:center;">
-                <div style="text-align:center; background:rgba(0,0,0,0.5);
-                    border:1.5px solid rgba(255,255,255,0.15); border-radius:20px;
+            <div style="display:flex;gap:12px;margin-bottom:22px;flex-wrap:wrap;justify-content:center;">
+                <div style="text-align:center;background:rgba(0,0,0,0.5);
+                    border:1.5px solid rgba(255,255,255,0.15);border-radius:20px;
                     padding:clamp(12px,4vw,18px) clamp(20px,6vw,36px);
-                    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); min-width:120px;">
-                    <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,255,255,0.5); text-transform:uppercase; margin-bottom:8px;">Your Score</div>
-                    <div style="font-size:clamp(36px,10vw,52px); font-weight:900; color:white; line-height:1; letter-spacing:-2px;">${score}</div>
+                    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-width:120px;">
+                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,255,255,0.5);text-transform:uppercase;margin-bottom:8px;">Your Score</div>
+                    <div style="font-size:clamp(36px,10vw,52px);font-weight:900;color:white;line-height:1;letter-spacing:-2px;">${score}</div>
                 </div>
-                <div style="text-align:center; background:rgba(0,0,0,0.5);
-                    border:1.5px solid rgba(255,215,0,0.3); border-radius:20px;
+                <div style="text-align:center;background:rgba(0,0,0,0.5);
+                    border:1.5px solid rgba(255,215,0,0.3);border-radius:20px;
                     padding:clamp(12px,4vw,18px) clamp(20px,6vw,36px);
-                    backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); min-width:120px;">
-                    <div style="font-size:11px; font-weight:800; letter-spacing:2px; color:rgba(255,215,0,0.6); text-transform:uppercase; margin-bottom:8px;">🏆 Best</div>
-                    <div style="font-size:clamp(36px,10vw,52px); font-weight:900; color:#ffd700; line-height:1; letter-spacing:-2px;">${bestFinal}</div>
+                    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-width:120px;">
+                    <div style="font-size:11px;font-weight:800;letter-spacing:2px;color:rgba(255,215,0,0.6);text-transform:uppercase;margin-bottom:8px;">🏆 Best</div>
+                    <div style="font-size:clamp(36px,10vw,52px);font-weight:900;color:#ffd700;line-height:1;letter-spacing:-2px;">${bestFinal}</div>
                 </div>
             </div>
-            ${isNewBest ? `<div style="margin-bottom:20px; background:linear-gradient(135deg,#ffd700,#ffaa00); color:#7a4a00; font-size:13px; font-weight:900; padding:8px 20px; border-radius:999px; box-shadow:0 4px 0 #b87a00; letter-spacing:1px;">🏆 NEW PERSONAL BEST!</div>` : ""}
+            ${isNewBest ? `<div style="margin-bottom:18px;background:linear-gradient(135deg,#ffd700,#ffaa00);color:#7a4a00;font-size:13px;font-weight:900;padding:8px 20px;border-radius:999px;box-shadow:0 4px 0 #b87a00;letter-spacing:1px;">🏆 NEW PERSONAL BEST!</div>` : ""}
             <button onclick="location.reload()">🦩 Start New Revolution</button>
-        </div>
-    `;
+        </div>`;
 }
 
+// ── PLAYER MOVEMENT ──
 function updatePlayer() {
     player.style.left = playerX + "px";
     player.style.transform = "translateX(-50%)";
@@ -430,7 +505,7 @@ document.addEventListener("touchmove", function(e) {
     e.preventDefault();
     playerX = e.touches[0].clientX;
     const max = SW() - 40;
-    if (playerX < 20) playerX = 20;
+    if (playerX < 20)  playerX = 20;
     if (playerX > max) playerX = max;
     updatePlayer();
 }, { passive: false });
@@ -440,7 +515,7 @@ document.addEventListener("mousemove", function(e) {
     if (e.buttons !== 1) return;
     playerX = e.clientX;
     const max = SW() - 40;
-    if (playerX < 20) playerX = 20;
+    if (playerX < 20)  playerX = 20;
     if (playerX > max) playerX = max;
     updatePlayer();
 });
