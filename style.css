@@ -82,11 +82,7 @@ body { background: #4ec0ca; }
     width: 72px; height: 72px;
     background: radial-gradient(circle, #fff7a0 30%, #ffd84d 65%, transparent 100%);
     border-radius: 50%; z-index: 2; transition: background 3s ease;
-    animation: sunPulse 6s ease-in-out infinite alternate;
-}
-@keyframes sunPulse {
-    0%   { box-shadow: 0 0 0 12px rgba(255,230,80,.18), 0 0 0 28px rgba(255,210,60,.10), 0 0 0 50px rgba(255,190,40,.07); }
-    100% { box-shadow: 0 0 0 20px rgba(255,230,80,.22), 0 0 0 45px rgba(255,210,60,.12), 0 0 0 70px rgba(255,190,40,.08); }
+    box-shadow: 0 0 0 16px rgba(255,230,80,.18), 0 0 0 36px rgba(255,210,60,.10);
 }
 
 /* ── CLOUDS ── */
@@ -106,7 +102,8 @@ body { background: #4ec0ca; }
     position: absolute; bottom: 35px; left: 50%;
     font-size: 95px; z-index: 50;
     user-select: none; touch-action: none;
-    filter: drop-shadow(0 0 8px #ff7ac8) drop-shadow(0 0 18px #ff7ac8) drop-shadow(0 0 30px #ff7ac8);
+    will-change: transform;
+    filter: drop-shadow(0 0 12px #ff7ac8);
     animation: flamingoBounce 0.9s ease-in-out infinite;
 }
 @keyframes flamingoBounce {
@@ -177,12 +174,12 @@ body { background: #4ec0ca; }
     padding: 8px 18px;
     letter-spacing: 0.5px;
     animation: shieldPulse 1.5s ease-in-out infinite alternate;
-    box-shadow: 0 0 18px rgba(0,207,255,0.18);
+    box-shadow: 0 0 18px rgba(0,207,255,0.3);
 }
 #shieldBadge.active { display: block; }
 @keyframes shieldPulse {
-    0%   { box-shadow: 0 0 10px rgba(0,207,255,0.2); }
-    100% { box-shadow: 0 0 26px rgba(0,207,255,0.6), 0 0 50px rgba(0,207,255,0.15); }
+    0%   { opacity: 0.75; }
+    100% { opacity: 1; }
 }
 
 /* ══════════════════════════════════
@@ -272,6 +269,8 @@ body { background: #4ec0ca; }
     background: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(255,64,129,0.13), transparent 80%);
     pointer-events: none;
 }
+
+
 
 #heroImg { display: none !important; }
 #startContent { display: contents; }
@@ -403,136 +402,4 @@ button:active { transform: translateY(3px) scale(0.97); box-shadow: 0 2px 0 #b01
     #startScreen p { font-size: 13px; padding: 8px 14px; }
     #startScreen .tagline { display: none; }
     button { min-width: 90vw; padding: 15px 24px; }
-}
-/* ══════════════════════════════════
-   BOSS FIGHT
-══════════════════════════════════ */
-#bossOverlay {
-    position: absolute; inset: 0;
-    background: rgba(10, 0, 0, 0.82);
-    z-index: 200;
-    overflow: hidden;
-}
-
-/* Warning splash */
-#bossWarning {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 10px;
-    opacity: 1; transition: opacity 0.4s ease;
-}
-#bossWarningIcon {
-    font-size: clamp(60px, 16vw, 100px);
-    animation: bossWarnPulse 0.4s ease-in-out infinite alternate;
-}
-@keyframes bossWarnPulse {
-    0%   { transform: scale(1);    filter: drop-shadow(0 0 10px rgba(255,80,0,0.5)); }
-    100% { transform: scale(1.15); filter: drop-shadow(0 0 28px rgba(255,80,0,1));   }
-}
-#bossWarningText {
-    font-family: 'Nunito', sans-serif;
-    font-size: clamp(2rem, 9vw, 4.5rem);
-    font-weight: 900; letter-spacing: -2px;
-    color: #ff3030;
-    text-shadow: 0 0 30px rgba(255,0,0,0.8), 0 2px 0 #7a0000;
-    animation: bossTextFlash 0.35s linear infinite;
-}
-@keyframes bossTextFlash {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.6; }
-}
-#bossRoundText {
-    font-family: 'Nunito', sans-serif;
-    font-size: clamp(1rem, 4vw, 1.6rem);
-    font-weight: 800; letter-spacing: 4px;
-    text-transform: uppercase;
-    color: rgba(255,160,80,0.85);
-}
-
-/* Boss HUD bar */
-#bossHud {
-    position: absolute; top: env(safe-area-inset-top, 16px); left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 0 16px; z-index: 220; pointer-events: none;
-}
-#bossHudLeft, #bossHudRight {
-    background: rgba(0,0,0,0.75);
-    border: 1.5px solid rgba(255,60,60,0.5);
-    border-radius: 16px; padding: 10px 18px;
-    text-align: center; min-width: 100px;
-}
-#bossHudLabel {
-    font-family: 'Nunito', sans-serif;
-    font-size: 9px; font-weight: 800;
-    color: rgba(255,120,80,0.7);
-    letter-spacing: 2px; text-transform: uppercase;
-    margin-bottom: 4px;
-}
-#bossHitCount {
-    font-family: 'Nunito', sans-serif;
-    font-size: clamp(22px, 6vw, 32px);
-    font-weight: 900; color: #fff;
-    letter-spacing: -1px; line-height: 1;
-}
-#bossTimerEl {
-    font-family: 'Nunito', sans-serif;
-    font-size: clamp(22px, 6vw, 32px);
-    font-weight: 900; color: #ffcc44;
-    letter-spacing: -1px; line-height: 1;
-    transition: color 0.3s;
-}
-
-/* Crosshair */
-#bossCrosshair {
-    position: absolute;
-    font-size: 42px; line-height: 1;
-    color: rgba(255, 60, 60, 0.85);
-    pointer-events: none; z-index: 215;
-    transform: translate(-50%, -50%);
-    left: 50%; top: 50%;
-    text-shadow: 0 0 12px rgba(255,0,0,0.7);
-    font-weight: 900;
-    animation: crosshairPulse 1s ease-in-out infinite alternate;
-}
-@keyframes crosshairPulse {
-    0%   { opacity: 0.7; transform: translate(-50%,-50%) scale(1);    }
-    100% { opacity: 1;   transform: translate(-50%,-50%) scale(1.12); }
-}
-
-/* Rama heads */
-.boss-head {
-    position: absolute;
-    border-radius: 50%;
-    overflow: hidden;
-    cursor: crosshair;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
-    user-select: none;
-}
-.boss-head:active { transform: scale(0.88) !important; }
-
-@media (max-width: 768px) {
-    #bossHudLeft, #bossHudRight { padding: 8px 12px; min-width: 78px; border-radius: 12px; }
-    #bossHudLabel { font-size: 8px; }
-}
-
-/* ── BOSS GUN ── */
-#bossGun {
-    position: absolute;
-    font-size: 52px;
-    pointer-events: none;
-    z-index: 216;
-    transform-origin: center center;
-    left: 50%; bottom: 60px;
-    transform: translate(-50%, -50%);
-    filter: drop-shadow(0 0 10px rgba(255,140,0,0.7));
-    transition: transform 0.04s linear;
-}
-
-#bossShootLine {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-    z-index: 211;
 }
