@@ -64,7 +64,7 @@ const SH = () => window.innerHeight;
 // ── CANVAS RESIZE ──
 function resizeCanvas() { pCanvas.width = SW(); pCanvas.height = SH(); }
 resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", resizeCanvas, { passive: true });
 
 // ══════════════════════════════════
 //  SPAWN PROBABILITY TABLE
@@ -85,15 +85,18 @@ function getSpawnWeights() {
     return              { flam: 0.25, multi: 0.07, shield: 0.05 };
 }
 
+// ── iOS detection — WebKit on iOS is more sensitive to particle overdraw ──
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
 // ══════════════════════════════════
 //  PARTICLES
 // ══════════════════════════════════
 function spawnParticles(x, y, color, count = 12, type = "burst") {
-    // Cap particle count on mobile to reduce GPU overdraw
-    const isMobile = SW() < 500;
-    const cap = isMobile ? Math.ceil(count * 0.55) : count;
+    // Cap particle count on iOS/mobile to reduce GPU overdraw
+    const mobileCap = isIOS ? 0.4 : (SW() < 500 ? 0.55 : 1);
+    const cap = Math.max(3, Math.ceil(count * mobileCap));
     for (let i = 0; i < cap; i++) {
-        const angle = (Math.PI * 2 / count) * i + Math.random() * 0.4;
+        const angle = (Math.PI * 2 / cap) * i + Math.random() * 0.4;
         const spd   = type === "burst" ? 3 + Math.random() * 5 : 1 + Math.random() * 3;
         particles.push({
             x, y,
@@ -110,28 +113,44 @@ function spawnParticles(x, y, color, count = 12, type = "burst") {
 
 function updateParticles() {
     pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-    particles = particles.filter(p => p.life > 0);
-    // Draw rects first, then circles — fewer state switches
-    for (let pass = 0; pass < 2; pass++) {
-        for (const p of particles) {
-            if ((pass === 0) === p.circle) continue; // pass0=rects, pass1=circles
-            p.x  += p.vx;
-            p.y  += p.vy;
-            p.vy += 0.18;
-            p.life -= p.decay;
-            if (p.life <= 0) continue;
-            pCtx.globalAlpha = p.life;
-            pCtx.fillStyle = p.color;
-            if (p.circle) {
-                pCtx.beginPath();
-                pCtx.arc(p.x | 0, p.y | 0, p.size / 2, 0, Math.PI * 2);
-                pCtx.fill();
-            } else {
-                const half = p.size / 2;
-                pCtx.fillRect((p.x - half) | 0, (p.y - half) | 0, p.size, p.size);
-            }
-        }
+    if (particles.length === 0) return;
+
+    // Update physics for all particles first
+    for (const p of particles) {
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.vy += 0.18;
+        p.life -= p.decay;
     }
+    particles = particles.filter(p => p.life > 0);
+    if (particles.length === 0) return;
+
+    // Draw rects
+    for (const p of particles) {
+        if (p.circle) continue;
+        pCtx.globalAlpha = p.life;
+        pCtx.fillStyle = p.color;
+        const half = p.size / 2;
+        pCtx.fillRect((p.x - half) | 0, (p.y - half) | 0, p.size, p.size);
+    }
+
+    // Draw circles — batch by colour to reduce fillStyle switches
+    let lastColor = "";
+    let inPath = false;
+    for (const p of particles) {
+        if (!p.circle) continue;
+        if (p.color !== lastColor) {
+            if (inPath) pCtx.fill();
+            pCtx.beginPath();
+            pCtx.fillStyle = p.color;
+            lastColor = p.color;
+            inPath = true;
+        }
+        pCtx.globalAlpha = p.life;
+        pCtx.moveTo((p.x | 0) + p.size / 2, p.y | 0);
+        pCtx.arc(p.x | 0, p.y | 0, p.size / 2, 0, Math.PI * 2);
+    }
+    if (inPath) pCtx.fill();
     pCtx.globalAlpha = 1;
 }
 
@@ -332,15 +351,20 @@ function spawnObject() {
 }
 
 // ── GAME LOOP ──
+// Cache player size constants — measured once, not every frame
+const PLAYER_W = 80;  // approximate half-width of player emoji in px
+const PLAYER_H = 80;  // approximate half-height
+
 let frame = 0;
 function gameLoop() {
     if (!gameRunning) return;
     frame++;
     updateParticles();
 
-    // Cache player rect once per frame instead of per item
-    const pRect = player.getBoundingClientRect();
-    const slop  = SW() < 500 ? 12 : 8;
+    // Player position from JS state — no DOM read needed
+    const pCX = playerX;                          // centre x
+    const pCY = SH() - 35 - PLAYER_H / 2;        // centre y (bottom: 35px)
+    const slop  = SW() < 500 ? 14 : 10;
 
     for (const item of activeItems) {
         let y = parseFloat(item.dataset.y || item.style.top);
@@ -354,12 +378,15 @@ function gameLoop() {
             item.style.left = Math.max(0, Math.min(SW() - getRamaSize(), ox + drift)) + "px";
         }
 
-        const iRect = item.getBoundingClientRect();
+        // Collision via stored position — zero DOM reads
+        const iX = parseFloat(item.style.left);
+        const iSize = item.dataset.good === "false" ? getRamaSize() : getFlamSize();
+        const iCX = iX + iSize / 2;
+        const iCY = y + iSize / 2;
+
         const hit =
-            iRect.left  + slop < pRect.right  - slop &&
-            iRect.right - slop > pRect.left   + slop &&
-            iRect.top   + slop < pRect.bottom - slop &&
-            iRect.bottom- slop > pRect.top    + slop;
+            Math.abs(iCX - pCX) < (iSize / 2 + PLAYER_W / 2 - slop) &&
+            Math.abs(iCY - pCY) < (iSize / 2 + PLAYER_H / 2 - slop);
 
         if (hit) {
             const type = item.dataset.good;
@@ -623,8 +650,9 @@ function loseLife() {
 
     let blinks = 0;
     const blinkInterval = setInterval(() => {
-        player.style.opacity = player.style.opacity === "0.4" ? "1" : "0.4";
-        if (++blinks >= 10) {
+        blinks++;
+        player.style.opacity = (blinks % 2 === 0) ? "1" : "0.4";
+        if (blinks >= 10) {
             clearInterval(blinkInterval);
             player.style.opacity = "1";
             invincible = false;
@@ -703,8 +731,8 @@ function gameOver() {
 
 // ── PLAYER MOVEMENT ──
 function updatePlayer() {
-    player.style.left      = playerX + "px";
-    player.style.transform = "translateX(-50%)";
+    // Use transform only — avoids triggering layout on `left` change
+    player.style.transform = `translateX(calc(${playerX}px - 50%))`;
 }
 
 document.addEventListener("touchmove", e => {
